@@ -1,17 +1,26 @@
-# استخدم نسخة Python مناسبة
-FROM python:3.12-slim
-
-# ضع مجلد العمل
+FROM node:20-slim
 WORKDIR /app
 
-# انسخ كل الملفات للمجلد داخل الحاوية
-COPY . .
+# Install git and required libraries
+RUN apt-get update && apt-get install -y \
+    git \
+    libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# ثبّت المتطلبات
-RUN pip install --no-cache-dir -r requirements.txt
+# Clone bolt.diy repository
+RUN git clone -b stable --depth 1 https://github.com/stackblitz-labs/bolt.diy.git .
 
-# صدّر البورت الذي يستخدمه التطبيق
-EXPOSE 7860
+# Install pnpm and dependencies
+RUN npm install -g pnpm@9.15.9
+RUN pnpm install --frozen-lockfile
 
-# شغّل التطبيق (تغيير الأمر حسب الملف الرئيسي في المشروع)
-CMD ["python", "launch.py"]
+# Copy our startup script (patches at runtime)
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Use existing node user for security
+RUN chown -R node:node /app
+USER node
+
+EXPOSE 5173
+CMD ["/app/start.sh"]
